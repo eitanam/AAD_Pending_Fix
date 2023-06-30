@@ -2,7 +2,7 @@
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $Form                                      = New-Object system.Windows.Forms.Form
-$Form.ClientSize                           = '400,350'
+$Form.ClientSize                           = '600,350'
 $Form.text                                 = "AAD Pending Computers Fix"
 $Form.TopMost                              = $true
 #----------------------
@@ -79,11 +79,12 @@ function rejoincheck ()
         rejoincheck
         if ($count -gt 5)
         {
-            $Status.text              = "There is an issue with "+$ComputerNameTextBox.text+", please contact System team"
+            $Status.text              = "There is an issue with "+$ComputerNameTextBox.text+". The certicates could not be installed."
             $Status.foreColor         = "Red"
             $Cancel.Visible           = $true
         }
     }
+    return
 }
 
 
@@ -127,7 +128,7 @@ function check ()
 else
 
 {
-    $Status.text              = $ComputerNameTextBox.text+" is not avialable"
+    $Status.text              = $ComputerNameTextBox.text+" is not avialable. Is it connected to your LAN?"
     $Status.foreColor         = "Red"
     $Cancel.Visible           = $true
 }
