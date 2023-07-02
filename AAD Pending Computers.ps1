@@ -3,7 +3,7 @@ Add-Type -AssemblyName System.Windows.Forms
 
 $Form                                      = New-Object system.Windows.Forms.Form
 $Form.ClientSize                           = '500,300'
-$Form.text                                 = "Tnuva AAD pending computers Fix"
+$Form.text                                 = "AAD pending computers Fix"
 $Form.TopMost                              = $true
 #----------------------
 #
