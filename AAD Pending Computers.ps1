@@ -1,16 +1,16 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $Form                                      = New-Object system.Windows.Forms.Form
-$Form.ClientSize                           = '600,350'
-$Form.text                                 = "AAD Pending Computers Fix"
+$Form.ClientSize                           = '500,300'
+$Form.text                                 = "Tnuva AAD pending computers Fix"
 $Form.TopMost                              = $true
 #----------------------
 #
 $Status                                    = New-Object 'system.Windows.Forms.Label'
 $Status.text                               = "Waiting for computer name"
-$Status.AutoSize                           = $true
-$Status.location                           = New-Object System.Drawing.Point(40,50)
+$Status.Size                               = New-Object System.Drawing.Point(400,50)
+$Status.location                           = New-Object System.Drawing.Point(60,50)
 $Status.font                               = 'Microsoft Sans Serif,10'
 #
 $ComputerName                              = New-Object 'system.Windows.Forms.Label'
@@ -27,40 +27,27 @@ $ComputerNameTextBox.location              = New-Object System.Drawing.Point(130
 $ComputerNameTextBox.Font                  = 'Microsoft Sans Serif,10'
 $ComputerNameTextBox.Enabled               = $true
 #
-$ADSyncServer                              = New-Object 'system.Windows.Forms.Label'
-$ADSyncServer.text                         = "AD Sync Server"
-$ADSyncServer.AutoSize                     = $true
-$ADSyncServer.location                     = New-Object System.Drawing.Point(20,150)
-$ADSyncServer.font                         = 'Microsoft Sans Serif,10'
-#
-$ADSyncServerTextBox                       = New-Object 'system.Windows.Forms.TextBox'
-$ADSyncServerTextBox                       = New-Object system.Windows.Forms.TextBox
-$ADSyncServerTextBox.multiline             = $false
-$ADSyncServerTextBox.Size                  = New-Object System.Drawing.Point(200,350)
-$ADSyncServerTextBox.location              = New-Object System.Drawing.Point(130,150)
-$ADSyncServerTextBox.Font                  = 'Microsoft Sans Serif,10'
-$ADSyncServerTextBox.Enabled               = $true
-#
 $Timer                                     = New-Object 'system.Windows.Forms.Label'
 $Timer.AutoSize                            = $true
-$Timer.location                            = New-Object System.Drawing.Point(20,200)
+$Timer.location                            = New-Object System.Drawing.Point(20,150)
 $Timer.font                                = 'Microsoft Sans Serif,10'
 #----------
 $Apply                                     = New-Object system.Windows.Forms.Button
 $Apply.text                                = "Fix"
 $Apply.width                               = 99
 $Apply.height                              = 30
-$Apply.location                            = New-Object System.Drawing.Point(70,280)
+$Apply.location                            = New-Object System.Drawing.Point(30,220)
 $apply.Add_Click({check})
 #----------
 $Cancel                                   = New-Object system.Windows.Forms.Button
 $Cancel.text                              = "Close"
 $Cancel.width                             = 98
 $Cancel.height                            = 30
-$Cancel.location                          = New-Object System.Drawing.Point(200,280)
+$Cancel.location                          = New-Object System.Drawing.Point(160,220)
 $Cancel.Add_Click({$Form.Close()})
 
-$Form.Controls.AddRange(@($Status,$ComputerNameTextBox, $ComputerName,$ADSyncServer,$ADSyncServerTextBox, $Timer, $apply, $cancel))
+$Form.Controls.AddRange(@($Status,$ComputerNameTextBox, $ComputerName,$Timer, $apply, $cancel))
+
 
 function rejoincheck ()
 {
@@ -72,21 +59,42 @@ function rejoincheck ()
         $Status.foreColor         = "green"
         $timer.Visible            = $false
         $Cancel.Visible           = $true
-    }
+        $apply.Visible            = $false
+   }
     else
     {
         $count = $count +1
-        rejoincheck
+        $Status.text              = "Trying "+$count+" of max 5 times"
         if ($count -gt 5)
         {
-            $Status.text              = "There is an issue with "+$ComputerNameTextBox.text+". The certicates could not be installed."
+            $Status.text              = "There is an issue with "+$ComputerNameTextBox.text+", please re-run the script"
             $Status.foreColor         = "Red"
             $Cancel.Visible           = $true
         }
+        sync
     }
-    return
-}
+ }
 
+
+function sync()
+{
+    
+   Invoke-Command -ComputerName wmradsync01 -ScriptBlock { Start-ADSyncSyncCycle -PolicyType Delta}
+    $Status.text              = "Waiting for sync to be completed"
+    $Status.foreColor         = "Purple"
+    $i = 60
+    do {
+        $Timer.text = "Seconds remaining : $($i)"
+        $Form.Refresh()
+        Sleep 1
+        $i--
+    } while ($i -gt 0)
+    $Status.text              = "Please wait, re-joining computer to AAD"
+    $Timer.Text               = " "
+    Invoke-Command -ComputerName $ComputerNameTextBox.text -ScriptBlock { schtasks.exe  /run /tn "\Microsoft\Windows\Workplace Join\Automatic-Device-Join"}
+    rejoincheck 
+
+}
 
 function register ()
 
@@ -97,28 +105,18 @@ function register ()
     $i = 60
     do {
         $Timer.text = "Seconds remaining : $($i)"
+        $Form.Refresh()
         Sleep 1
         $i--
-    } while ($i -gt 0)
-
-    Invoke-Command -ComputerName wmradsync01 -ScriptBlock { Start-ADSyncSyncCycle -PolicyType Delta}
-    $Status.text              = "Waiting for sync to be completed"
-    $Status.foreColor         = "Purple"
-    $i = 60
-    do {
-        $Timer.text = "Seconds remaining : $($i)"
-        Sleep 1
-        $i--
-    } while ($i -gt 0)
-    $Status.text              = "Please wait, re-joining computer to AAD"
-    Invoke-Command -ComputerName $ComputerNameTextBox.text -ScriptBlock { schtasks.exe  /run /tn "\Microsoft\Windows\Workplace Join\Automatic-Device-Join"}
-    rejoincheck
+    }while ($i -gt 0)
+    sync
 }
 
 function check ()
 {
 
     $Cancel.Visible           = $false
+    $apply.Visible            = $false
     $Status.text              = "Trying to communicate with "+$ComputerNameTextBox.text+" please wait"
     $Status.foreColor         = "orange"
     if (Test-Connection $ComputerNameTextBox.text -Quiet)
@@ -128,7 +126,7 @@ function check ()
 else
 
 {
-    $Status.text              = $ComputerNameTextBox.text+" is not avialable. Is it connected to your LAN?"
+    $Status.text              = $ComputerNameTextBox.text+" is not avialable"
     $Status.foreColor         = "Red"
     $Cancel.Visible           = $true
 }
